@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>Тестовое задание</title>
+</head>
+<body class="container">
+    {% csrf_token %}
+    <style>
+        input.phone, input.u_name {
+            font-size: 16px;
+            font-family: Times New Roman;
+        }
+        input.notActive{
+            border: none;
+            pointer-events: none;
+        }
+        input.edit {
+            border: none;
+            box-shadow: none;
+            font-size: 16px;
+            font-family: Times New Roman;
+            text-decoration: underline;
+            color: blue;
+            background: inherit;
+        }
+    </style>
+    <form method="POST" action="create/">
+        {% csrf_token %}
+        <p>
+            <label>Введите имя</label><br>
+            <input type="text" name="name" />
+        </p>
+        <p>
+            <label>Введите номер телефона</label><br>
+            <input type="text" name="phone" />
+        </p>
+        <input type="submit" value="Сохранить" >
+    </form>
+    {% if people %}
+    <h2>Список пользователей</h2>
+    <table id="UserList">
+        <thead><th>Имя</th><th>Номер телефона</th><th></th></thead>
+        {% for person in people %}
+        <tr>
+            <td>
+                <input id="name{{person.id}}" type="text" class="u_name notActive" value="{{ person.name }}"/>
+            </td>
+            <td>
+                <input id="phone{{person.id}}" type="text" class="phone notActive" value="{{ person.phone }}"/>
+            </td>
+            <td>
+                <input type="submit" data-id="{{person.id}}" value="Изменить" class="edit"> | <a href="delete/{{person.id}}">Удалить</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    <input type="submit" value="Показать еще" id="showMore">
+    {% endif %}
+
+
+
+<!--Скрипт по аякс зарузке-->
+<!--Подключим JQuery-->
+<script
+  src="https://code.jquery.com/jquery-3.4.1.min.js"
+  integrity="sha256-CSXorXvZcTkaix6Yvo6HppcZGetbYMGWSFlBw8HfCJo="
+  crossorigin="anonymous"></script>
+<script>
+  $(document).ready(function(){
+    $(document).on('click', '#showMore',function(){
+      //Определяем блок с юзерами
+      ul_block = $(document).find('#UserList')
+      //Если не установлина страница, ставим первую
+      if (!ul_block.attr('data-page')){
+        ul_block.attr('data-page', 1)
+      }
+      //Определяем страницу и делаем шаг
+      var page = parseInt(ul_block.attr('data-page'))+1;
+      //AJAX запрос
+      $.ajax({
+        //Путь
+        url: '/',
+        //Тип запроса
+        type: 'GET',
+        //дата которая передается в запросе, в данном случае указывается страница и то что это аякс запрос
+        data: {page:page, is_ajax: 'Y'},
+        //После того как получили ответ от сервера, в data хранится ответ
+        success: function(data) {
+          //Декодим json
+          normalData = JSON.parse(htmlSpecialChar_decode(data));
+          //меняем текущую страницу
+          ul_block.attr('data-page', page);
+          //проверяем наличе елементов в ответе
+          if (normalData.list.length > 0) {
+            //разбераем в цикле ответ
+            for(ind in normalData.list){
+              //елемент
+              el = normalData.list[ind];
+              //делаем новый DOM елемент
+              newString = $('<tr>');
+              //добавляем имя
+              newString.append('<td><input id="name'+el.id+'" type="text" class="u_name notActive" value="'+el.name+'"/></td>');
+              //добавляем телефон
+              newString.append('<td><input id="phone'+el.id+'" type="text" class="phone notActive" value="'+el.phone+'"/></td>');
+              //добавляем кнопки
+              newString.append('<input type="submit" data-id="'+el.id+'" value="Изменить" class="edit"> | <a href="delete/'+el.id+'">Удалить</a>');
+              //Добавляем новый елемент в конец списка с юзерами
+              ul_block.append(newString);
+            }
+          } else {
+            //если ответа нет, то удаляем кнопку показа больше
+            $(document).find('#showMore').remove();
+          }
+          //если сервер отдал то что страница была последней, то удаляем кнопку показа
+          if (normalData.is_over == true){
+            $(document).find('#showMore').remove();
+          }
+        }
+      })
+    })
+    //инициализация кнопки Изменить
+    $(document).on('click','.edit', function(){
+      //получаем ID елемента
+      var elID = $(this).attr('data-id');
+      if (elID){
+        //убираем класы неактивности
+        $(document).find('#name'+elID+', #phone'+elID).removeClass('notActive')
+        //фокусимся на строке имя
+        $(document).find('#name'+elID).focus()
+        //меняем кнопку с изменить на сохранить
+        $(this).removeClass('edit')
+        $(this).addClass('save_edit_element')
+        $(this).val('Сохранить')
+      }
+    })
+    //инициализация кнопки Сохранить
+    $(document).on('click', '.save_edit_element', function(){
+      //получаем ID елемента
+      var elID = $(this).attr('data-id');
+      if (elID){
+        //получаем новые данные
+        var newName = $(document).find('#name'+elID).val()
+        var newPhone = $(document).find('#phone'+elID).val()
+        //получаем токен для пост запроса
+        var csrfToken = $(document).find('[name="csrfmiddlewaretoken"]').val()
+        if (newName && newPhone) {
+          //делаем снованеактивными поля
+          $(document).find('#name'+elID+', #phone'+elID).addClass('notActive')
+          //меняем кнопку сохранить на изменить
+          $(this).removeClass('save_edit_element')
+          $(this).addClass('edit')
+          $(this).val('Изменить')
+          //делаем запрос
+          $.ajax({
+            //путь
+            url: '/edit/'+elID+'/',
+            //тип запроса
+            type: 'POST',
+            //данные передачи
+            data: {is_ajax: 'Y', csrfmiddlewaretoken: csrfToken, name: newName, phone: newPhone},
+            //после получения ответа
+            success: function(data) {
+              //парсим json
+              normalData = JSON.parse(htmlSpecialChar_decode(data));
+              //проверяем сохранил ли он наши данные
+              if (normalData.successRequest){
+                alert('Изменения сохранены')
+              } else {
+                alert('Произошла ошибка')
+              }
+            }
+          })
+        } else {
+          //предупреждения о том что надо заполнить все поля
+          alert('Для сохранения заполните все поля!')
+        }
+      }
+    });
+  })
+  htmlSpecialChar_decode = function(value) {
+    return value.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&#039;/g, "'");
+  };
+</script>
+</body>
+</html>
